@@ -10,7 +10,7 @@ Opencc开放中文转换 - 将混杂不同标准的繁体字形转换为《通�
 ## 使用说明
 Opencc转换的配置文件存于本仓库的“t2gov”文件夹下，使用者应自行拷贝到Opencc的方案文件夹中。具体可参照Opencc的说明文档。
 
-基于使用者可以进行自定义/编辑转换字表、词典的考虑，“t2gov”下的字表、词典均为txt格式，而并未转换为ocd2格式。使用者可以调用Opencc自行转换。
+基于使用者可以进行自定义/编辑转换字表、词典的考虑，“t2gov”下的字表、词典均为txt格式，而并未转换为ocd2格式。使用者可以调用Opencc自行转换ocd2，转换后应相应编辑t2gov.json文件令其使用ocd2。
 
 “transformer”文件夹下提供了一个Python转换脚本。以Windows系统上使用为例，使用者在部署好Python环境后，在Powershell里执行pip install opencc python-docx chardet lxml pywin32命令，安装依赖。安装成功后，将“t2gov”文件夹下所有文件复制到C:\Users\administrator(注：此处为你的计算机用户名，默认名称为administrator或admin，如有微软账户一般则为微软账户名)\AppData\Local\Programs\Python\Python313(注：此处为你安装的Python版本号，如有多个文件夹取数字最大的那个)\Lib\site-packages\opencc\clib\share\opencc下，再下载“transformer”文件夹里的转换脚本并运行，即可实现doc文档、docx文档及txt文件的繁体字形转换。
 
