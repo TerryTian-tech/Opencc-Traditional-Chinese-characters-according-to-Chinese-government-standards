@@ -184,7 +184,7 @@ def convert_doc_to_docx(input_path, output_folder):
 
 def convert_txt_t2gov(input_path, output_folder):
     """
-    将txt文件转换为简体
+    将txt文件转换为规范繁体
     :param input_path: 输入文件路径
     :param output_folder: 输出文件夹路径
     :return: 转换后的文件路径或False
@@ -231,7 +231,7 @@ class DocxTraditionalSimplifiedConverter:
         """
         初始化转换器
         config: 转换配置
-        - 't2gov': 繁体转简体
+        - 't2gov': 繁体转规范繁体
         """
         self.cc = OpenCC(config)
         self.config = config
@@ -506,7 +506,7 @@ class DocxTraditionalSimplifiedConverter:
 
 def convert_docx_t2gov(input_path, output_folder):
     """
-    将Word文档转换为简体/繁体
+    将Word文档转换为规范繁体
     :param input_path: 输入文件或文件夹路径
     :param output_folder: 输出文件夹路径
     """
