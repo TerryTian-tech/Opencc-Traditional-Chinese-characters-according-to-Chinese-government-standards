@@ -8,7 +8,7 @@ OpenCC开放中文转换 - 将混杂不同标准的繁体字形转换为《通�
 本仓库同时提供了一个Python程序，能够实现doc文档、docx文档及txt文件的繁体字形转换。该脚本仍以OpenCC作为转换引擎。
 
 ## 使用说明
-!!! Note :对于想在Win10/Win11下使用转换脚本但不想体验繁琐的部署、安装流程的使用者，本仓库的[Releases](https://github.com/TerryTian-tech/OpenCC-Traditional-Chinese-characters-according-to-Chinese-government-standards/releases)下已提供了一个由pyinstaller打包的免安装运行版本。
+>对于想在Win10/Win11下使用转换脚本但不想体验繁琐的部署、安装流程的使用者，本仓库的[Releases](https://github.com/TerryTian-tech/OpenCC-Traditional-Chinese-characters-according-to-Chinese-government-standards/releases)下已提供了一个由pyinstaller打包的免安装运行版本。
 
 OpenCC转换的配置文件存于本仓库的“t2gov”文件夹下，使用者应自行拷贝到OpenCC的方案文件夹中，具体可参照OpenCC的说明文档。字表*文件名为TGCharacters.txt，词典文件名为TGPhrases.txt。基于使用者可以进行自定义/编辑转换字表、词典的考虑，“t2gov”下的字表、词典均为txt格式，并未转换为ocd2格式。使用者可以调用OpenCC自行转换ocd2，转换后应相应编辑t2gov.json文件令其使用ocd2。
 
