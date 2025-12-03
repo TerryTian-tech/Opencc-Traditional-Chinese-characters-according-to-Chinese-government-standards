@@ -6,15 +6,325 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import re
-import msvcrt  # 用于检测键盘输入
+import msvcrt
 import codecs
 import chardet
 import zipfile
 import tempfile
 import shutil
 import xml.etree.ElementTree as ET
-import win32com.client as win32 # 添加win32com导入，用于DOC转DOCX
+import win32com.client as win32
+import threading
+import time
+from datetime import datetime
 
+# GUI部分导入
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox, scrolledtext
+from PIL import Image, ImageTk
+import sys
+import ctypes
+
+# 高DPI支持设置
+def set_dpi_awareness():
+    """设置DPI感知以提高高DPI屏幕显示质量"""
+    try:
+        # 告诉系统我们支持高DPI
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except:
+        try:
+            # 回退到旧版DPI感知
+            ctypes.windll.user32.SetProcessDPIAware()
+        except:
+            pass
+
+class RedirectText:
+    """重定向输出到文本框"""
+    def __init__(self, text_widget):
+        self.text_widget = text_widget
+        
+    def write(self, string):
+        self.text_widget.insert(tk.END, string)
+        self.text_widget.see(tk.END)
+        self.text_widget.update_idletasks()
+        
+    def flush(self):
+        pass
+
+class TraditionalConverterGUI:
+    def __init__(self, root):
+        self.root = root
+        
+        # 设置高DPI缩放
+        self.setup_dpi_scaling()
+        
+        self.root.title("OpenCC-Traditional Chinese to Traditional Chinese (The Chinese Government Standard)")
+        self.root.geometry("1100x860")  # 增加默认窗口尺寸
+        self.root.resizable(True, True)
+        
+        # 设置图标
+        try:
+            self.root.iconbitmap("favicon.ico")
+        except:
+            pass
+        
+        # 设置样式
+        self.setup_styles()
+        
+        # 创建界面
+        self.create_widgets()
+        
+        # 重定向输出
+        sys.stdout = RedirectText(self.log_text)
+        
+        # 转换状态
+        self.is_converting = False
+        self.conversion_thread = None
+        self.input_type = "file"  # 默认输入类型：单个文件
+
+        # 添加mode_var定义
+        self.mode_var = tk.StringVar(value="繁体转规范繁体")
+        
+    def setup_dpi_scaling(self):
+        """设置DPI缩放以适应高分辨率屏幕"""
+        # 获取系统DPI缩放比例
+        try:
+            dpi = self.root.winfo_fpixels('1i')
+            scaling = dpi / 96.0  # 标准DPI是96
+            
+            # 设置tkinter缩放因子
+            self.root.tk.call('tk', 'scaling', scaling)
+            
+            # 设置字体缩放
+            self.font_scaling = max(1.0, scaling)
+            
+        except Exception as e:
+            print(f"DPI设置警告: {e}")
+            self.font_scaling = 1.0
+    
+    def setup_styles(self):
+        """设置界面样式，适配高DPI"""
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # 根据DPI缩放调整字体大小
+        base_font_size = 12
+        title_font_size = 16
+        scaled_font_size = int(base_font_size * self.font_scaling)
+        scaled_title_size = int(title_font_size * self.font_scaling)
+        
+        # 配置字体
+        default_font = ('Microsoft YaHei UI', scaled_font_size)  # 使用UI字体
+        title_font = ('Microsoft YaHei UI', scaled_title_size, 'bold')
+        
+        # 大一号字体（用于特定控件）
+        large_font = ('Microsoft YaHei UI', scaled_font_size + 1)
+        
+        # 配置样式
+        style.configure('TFrame', background='#f5f5f5')
+        style.configure('TLabel', background='#f5f5f5', font=default_font)
+        style.configure('Title.TLabel', background='#f5f5f5', font=title_font)
+        style.configure('TButton', font=default_font, padding=(10, 5))
+        style.configure('Action.TButton', font=default_font, padding=(15, 8))
+        style.configure('TProgressbar', thickness=25)
+        style.configure('TEntry', font=default_font, padding=5)
+        
+        # 配置大号字体样式
+        style.configure('Large.TLabel', background='#f5f5f5', font=large_font)
+        style.configure('Large.TRadiobutton', font=large_font)
+        
+        # 配置Combobox的大号字体
+        style.configure('Large.TCombobox', font=large_font)
+        
+        # 配置日志文本框字体
+        self.log_font = ('Consolas', max(9, int(9 * self.font_scaling)))
+        
+    def create_widgets(self):
+        """创建界面组件"""
+        # 主框架
+        main_frame = ttk.Frame(self.root, padding="15")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # 配置网格权重
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        main_frame.columnconfigure(1, weight=1)
+        main_frame.rowconfigure(4, weight=1)
+        
+        # 标题
+        title_label = ttk.Label(main_frame, text="规范繁体字转换器-将繁体转换为《通用规范汉字表》规范繁体字形", style='Title.TLabel')
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 25))
+        
+        # 输入类型选择
+        ttk.Label(main_frame, text="输入类型:", style='Large.TLabel').grid(row=2, column=0, sticky=tk.W, pady=8)
+        
+        input_type_frame = ttk.Frame(main_frame)
+        input_type_frame.grid(row=2, column=1, sticky=tk.W, padx=(10, 0), pady=8)
+        
+        self.input_type_var = tk.StringVar(value="file")
+        ttk.Radiobutton(input_type_frame, text="单个文件", variable=self.input_type_var, 
+                       value="file", command=self.on_input_type_change, style='Large.TRadiobutton').pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Radiobutton(input_type_frame, text="文件夹", variable=self.input_type_var, 
+                       value="folder", command=self.on_input_type_change, style='Large.TRadiobutton').pack(side=tk.LEFT)
+        
+        # 输入路径选择
+        self.input_label_text = tk.StringVar(value="输入文件:")
+        ttk.Label(main_frame, textvariable=self.input_label_text).grid(row=4, column=0, sticky=tk.W, pady=8)
+        
+        self.input_path = tk.StringVar()
+        input_entry = ttk.Entry(main_frame, textvariable=self.input_path, width=70)
+        input_entry.grid(row=4, column=1, sticky=(tk.W, tk.E), padx=(10, 10), pady=8)
+        
+        self.browse_button = ttk.Button(main_frame, text="浏览文件", command=self.browse_input, width=12)
+        self.browse_button.grid(row=4, column=2, pady=8)
+        
+        # 输出路径选择
+        ttk.Label(main_frame, text="输出文件夹:").grid(row=5, column=0, sticky=tk.W, pady=8)
+        self.output_path = tk.StringVar()
+        output_entry = ttk.Entry(main_frame, textvariable=self.output_path, width=70)
+        output_entry.grid(row=5, column=1, sticky=(tk.W, tk.E), padx=(10, 10), pady=8)
+        ttk.Button(main_frame, text="浏览文件夹", command=self.browse_output, width=12).grid(row=5, column=2, pady=8)
+        
+        # 按钮框架
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=6, column=0, columnspan=3, pady=25)
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(1, weight=1)
+        button_frame.columnconfigure(2, weight=1)
+        
+        # 转换按钮
+        self.convert_button = ttk.Button(button_frame, text="开始转换", command=self.start_conversion, style='Action.TButton')
+        self.convert_button.grid(row=0, column=0, padx=15, ipadx=25)
+        
+        # 清空日志按钮
+        ttk.Button(button_frame, text="清空日志", command=self.clear_log).grid(row=0, column=1, padx=15, ipadx=25)
+        
+        # 退出按钮
+        ttk.Button(button_frame, text="退出程序", command=self.root.quit).grid(row=0, column=2, padx=15, ipadx=25)
+        
+        # 进度条
+        self.progress = ttk.Progressbar(main_frame, mode='indeterminate')
+        self.progress.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 15))
+        
+        # 日志框架
+        log_frame = ttk.LabelFrame(main_frame, text="转换日志", padding="8")
+        log_frame.grid(row=8, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+        
+        # 日志文本框
+        self.log_text = scrolledtext.ScrolledText(log_frame, height=18, width=90, font=self.log_font)
+        self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # 状态栏
+        self.status_var = tk.StringVar(value="就绪")
+        status_bar = ttk.Label(main_frame, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
+        status_bar.grid(row=9, column=0, columnspan=3, sticky=(tk.W, tk.E))
+        
+    def on_input_type_change(self):
+        """输入类型改变事件处理"""
+        self.input_type = self.input_type_var.get()
+        if self.input_type == "file":
+            self.input_label_text.set("输入文件:")
+            self.browse_button.config(text="浏览文件")
+        else:
+            self.input_label_text.set("输入文件夹:")
+            self.browse_button.config(text="浏览文件夹")
+        
+    def browse_input(self):
+        """浏览输入文件或文件夹"""
+        if self.input_type == "file":
+            path = filedialog.askopenfilename(
+                title="选择输入文件",
+                filetypes=[("支持的文件", "*.docx *.doc *.txt"), ("Word文档", "*.docx *.doc"), ("文本文件", "*.txt"), ("所有文件", "*.*")]
+            )
+        else:
+            path = filedialog.askdirectory(title="选择输入文件夹")
+        
+        if path:
+            self.input_path.set(path)
+            
+    def browse_output(self):
+        """浏览输出文件夹"""
+        path = filedialog.askdirectory(title="选择输出文件夹")
+        if path:
+            self.output_path.set(path)
+            
+    def clear_log(self):
+        """清空日志"""
+        self.log_text.delete(1.0, tk.END)
+        
+    def start_conversion(self):
+        """开始转换"""
+        if self.is_converting:
+            messagebox.showwarning("警告", "转换正在进行中，请等待完成")
+            return
+            
+        input_path = self.input_path.get().strip()
+        output_path = self.output_path.get().strip()
+        
+        if not input_path:
+            messagebox.showerror("错误", "请输入输入路径")
+            return
+            
+        if not output_path:
+            messagebox.showerror("错误", "请输入输出路径")
+            return
+            
+        if not os.path.exists(input_path):
+            messagebox.showerror("错误", f"输入路径不存在: {input_path}")
+            return
+            
+        # 开始转换
+        self.is_converting = True
+        self.convert_button.config(state="disabled")
+        self.progress.start(10)
+        self.status_var.set("转换中...")
+        
+        # 在新线程中运行转换
+        self.conversion_thread = threading.Thread(
+            target=self.run_conversion, 
+            args=(input_path, output_path, self.input_type)
+        )
+        self.conversion_thread.daemon = True
+        self.conversion_thread.start()
+        
+        # 检查线程状态
+        self.check_conversion_status()
+        
+    def run_conversion(self, input_path, output_path, input_type):
+        """运行转换任务"""
+        try:
+            print(f"开始转换: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"转换模式: 繁体转规范繁体")  # 删除了 self.mode_var.get()，因为代码中没有定义 mode_var
+            print(f"输入类型: {'单个文件' if input_type == 'file' else '文件夹'}")
+            print(f"输入路径: {input_path}")
+            print(f"输出路径: {output_path}")
+            print("-" * 50)
+        
+            # 调用原有的转换函数
+            convert(input_path, output_path)
+        
+            print("-" * 50)
+            print(f"转换完成: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        except Exception as e:
+            print(f"转换过程中发生错误: {str(e)}")
+            
+    def check_conversion_status(self):
+        """检查转换状态"""
+        if self.conversion_thread.is_alive():
+            # 线程仍在运行，继续检查
+            self.root.after(100, self.check_conversion_status)
+        else:
+            # 转换完成
+            self.is_converting = False
+            self.convert_button.config(state="normal")
+            self.progress.stop()
+            self.status_var.set("转换完成")
+            messagebox.showinfo("完成", "文件转换已完成！")
+
+# 原有的功能函数（保持不变）
 def wait_for_esc():
     """等待用户按下ESC键"""
     print("\n按ESC键退出...")
@@ -182,7 +492,7 @@ def convert_doc_to_docx(input_path, output_folder):
         print(f"处理DOC文件 {input_path} 时出错: {str(e)}")
         return False
 
-def convert_txt_t2gov(input_path, output_folder):
+def convert_txt(input_path, output_folder):
     """
     将txt文件转换为规范繁体
     :param input_path: 输入文件路径
@@ -504,7 +814,7 @@ class DocxTraditionalSimplifiedConverter:
                     for nested_table in cell.tables:
                         self._convert_tables([nested_table])
 
-def convert_docx_t2gov(input_path, output_folder):
+def convert_docx(input_path, output_folder):
     """
     将Word文档转换为规范繁体
     :param input_path: 输入文件或文件夹路径
@@ -522,7 +832,6 @@ def convert_docx_t2gov(input_path, output_folder):
                     if f.lower().endswith('.docx')]
         else:
             print("错误：输入的路径既不是有效的.docx文件也不是文件夹")
-            wait_for_esc()
             return
         
         print(f"找到 {len(files)} 个Word文档待处理")
@@ -535,20 +844,15 @@ def convert_docx_t2gov(input_path, output_folder):
                 converter = DocxTraditionalSimplifiedConverter('t2gov')
                 output_path = os.path.join(output_folder, f"convert_{os.path.basename(file_path)}")
                 converter.convert_document(file_path, output_path)
-                
                 print(f"已保存: {output_path}")
                 
             except Exception as e:
                 print(f"处理 {file_path} 时出错: {str(e)}")
-        
-        # 转换完成后等待用户按下ESC
-        wait_for_esc()
     
     except Exception as e:
         print(f"发生错误: {str(e)}")
-        wait_for_esc()
 
-def convert_t2gov(input_path, output_folder):
+def convert(input_path, output_folder):
     """
     统一处理docx、doc和txt文件的繁简转换
     :param input_path: 输入文件或文件夹路径
@@ -563,7 +867,7 @@ def convert_t2gov(input_path, output_folder):
         file_ext = os.path.splitext(input_path)[1].lower()
         
         if file_ext == '.docx':
-            convert_docx_t2gov(input_path, output_folder)
+            convert_docx(input_path, output_folder)
         elif file_ext == '.doc':
             # 先转换为DOCX，然后再进行繁简转换   
             print("检测到DOC文件，先转换为DOCX格式...")
@@ -573,21 +877,17 @@ def convert_t2gov(input_path, output_folder):
                 docx_path = convert_doc_to_docx(input_path, temp_dir)
                 if docx_path:
                     print("DOC文件转换成功，开始繁简转换...")
-                    convert_docx_t2gov(docx_path, output_folder)
+                    convert_docx(docx_path, output_folder)
                 else:
                     print("DOC文件转换失败")
-                    wait_for_esc()
         elif file_ext == '.txt':
-            result = convert_txt_t2gov(input_path, output_folder)
+            result = convert_txt(input_path, output_folder)
             if result:
                 print("txt文件转换完成！")
-                wait_for_esc()
             else:
                 print("txt文件转换失败")
-                wait_for_esc()
         else:
             print("错误：不支持的文件格式，仅支持docx、doc和txt文件")
-            wait_for_esc()
             return
     
     # 处理文件夹
@@ -601,7 +901,6 @@ def convert_t2gov(input_path, output_folder):
         
         if not supported_files:
             print("在指定文件夹中未找到支持的.docx、.doc或.txt文件")
-            wait_for_esc()
             return
             
         print(f"找到 {len(supported_files)} 个文件待处理")
@@ -621,7 +920,6 @@ def convert_t2gov(input_path, output_folder):
                     converter.convert_document(file_path, output_path)
                     success_count += 1
                     print(f"已保存: {output_path}")
-                    
                 except Exception as e:
                     print(f"处理 {filename} 时出错: {str(e)}")
             
@@ -646,21 +944,31 @@ def convert_t2gov(input_path, output_folder):
                         print(f"DOC文件 {filename} 转换失败")
             
             elif file_ext == '.txt':
-                if convert_txt_t2gov(file_path, output_folder):
+                if convert_txt(file_path, output_folder):
                     success_count += 1
         
         print(f"\n处理完成！成功转换 {success_count}/{len(supported_files)} 个文件")
-        wait_for_esc()
     
     else:
         print("错误：输入的路径既不是有效的文件也不是文件夹")
-        wait_for_esc()
         return
 
-if __name__ == "__main__":
-    print("将繁体Word文档或txt文件转换成2013年版《通用规范汉字表》规范繁体字形")
-    print("=" * 60)
+def main():
+    """主函数 - 启动GUI界面"""
+    # 设置DPI感知
+    set_dpi_awareness()
     
-    input_path = input("请输入Word文档或txt文件路径: ").strip('"\'')
-    output_folder = input("请输入输出文件夹路径: ").strip('"\'')
-    convert_t2gov(input_path, output_folder)
+    root = tk.Tk()
+    app = TraditionalConverterGUI(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        main()
+    else:
+        print("将繁体Word文档或txt文件转换成2013年版《通用规范汉字表》规范繁体字形")
+        print("=" * 60)
+        
+        input_path = input("请输入Word文档或txt文件路径: ").strip('"\'')
+        output_folder = input("请输入输出文件夹路径: ").strip('"\'')
+        convert(input_path, output_folder)
