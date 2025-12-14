@@ -15,7 +15,7 @@
         "file": "TGPhrases.txt"
       }, {
         "type": "text",
-        "file": "TGCharacters.txt"
+        "file": "TGCharacters_keep_simp.txt"
       }]
     }
   }]

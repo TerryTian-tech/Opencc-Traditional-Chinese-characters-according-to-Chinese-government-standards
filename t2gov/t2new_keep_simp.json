@@ -1,0 +1,16 @@
+{
+  "name": "Traditional Chinese to Traditional Chinese (New characters)",
+  "segmentation": {
+    "type": "mmseg",
+    "dict": {
+      "type": "text",
+      "file": "GovVariants_keep_simp.txt"
+    }
+  },
+  "conversion_chain": [{
+    "dict": {
+      "type": "text",
+      "file": "GovVariants_keep_simp.txt"
+    }
+  }]
+}

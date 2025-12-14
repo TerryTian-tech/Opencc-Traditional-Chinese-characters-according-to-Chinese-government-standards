@@ -80,10 +80,10 @@ class TraditionalConverterGUI:
         # 转换状态
         self.is_converting = False
         self.conversion_thread = None
+        
+        # 转换模式
+        self.conversion_mode = "t2gov"  # 默认繁体转规范繁体
         self.input_type = "file"  # 默认输入类型：单个文件
-
-        # 添加mode_var定义
-        self.mode_var = tk.StringVar(value="繁体转规范繁体")
         
     def setup_dpi_scaling(self):
         """设置DPI缩放以适应高分辨率屏幕"""
@@ -149,11 +149,23 @@ class TraditionalConverterGUI:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(4, weight=1)
+        main_frame.rowconfigure(6, weight=1)
         
         # 标题
-        title_label = ttk.Label(main_frame, text="规范繁体字转换器-将繁体转换为《通用规范汉字表》规范繁体字形", style='Title.TLabel')
-        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 25))
+        title_label = ttk.Label(main_frame, text="规范繁体字转换器", style='Title.TLabel')
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+        
+        # 转换模式选择
+        ttk.Label(main_frame, text="转换模式:", style='Large.TLabel').grid(row=1, column=0, sticky=tk.W, pady=8)
+        
+        self.mode_var = tk.StringVar(value="繁体转规范繁体")
+        mode_options = ["繁体转规范繁体", "繁体转规范繁体(保留原有简体字)", "只将繁体旧字形转新字形", "只将繁体旧字形转新字形(保留原有简体字)"]
+        mode_combobox = ttk.Combobox(main_frame, textvariable=self.mode_var, values=mode_options, state="readonly", width=31)
+        mode_combobox.grid(row=1, column=1, sticky=tk.W, padx=(10, 10), pady=8)
+        mode_combobox.bind('<<ComboboxSelected>>', self.on_mode_change)
+        
+        # 设置Combobox字体为大号
+        mode_combobox.configure(font=('Microsoft YaHei UI', int(12 * self.font_scaling) + 1))
         
         # 输入类型选择
         ttk.Label(main_frame, text="输入类型:", style='Large.TLabel').grid(row=2, column=0, sticky=tk.W, pady=8)
@@ -166,6 +178,11 @@ class TraditionalConverterGUI:
                        value="file", command=self.on_input_type_change, style='Large.TRadiobutton').pack(side=tk.LEFT, padx=(0, 15))
         ttk.Radiobutton(input_type_frame, text="文件夹", variable=self.input_type_var, 
                        value="folder", command=self.on_input_type_change, style='Large.TRadiobutton').pack(side=tk.LEFT)
+        
+        # 模式说明标签
+        self.mode_desc = tk.StringVar(value="将繁体字形转换为符合2013版《通用规范汉字表》的规范繁体字形")
+        mode_desc_label = ttk.Label(main_frame, textvariable=self.mode_desc, foreground="#666666", font=('Microsoft YaHei UI', 11))
+        mode_desc_label.grid(row=3, column=0, columnspan=3, sticky=tk.W, pady=(0, 15))
         
         # 输入路径选择
         self.input_label_text = tk.StringVar(value="输入文件:")
@@ -220,6 +237,18 @@ class TraditionalConverterGUI:
         self.status_var = tk.StringVar(value="就绪")
         status_bar = ttk.Label(main_frame, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.grid(row=9, column=0, columnspan=3, sticky=(tk.W, tk.E))
+        
+    def on_mode_change(self, event=None):
+        """转换模式改变事件处理"""
+        mode = self.mode_var.get()
+        mode_map = {
+            "繁体转规范繁体": ("t2gov", "将繁体字形转换为符合2013版《通用规范汉字表》的规范繁体字形"),
+            "繁体转规范繁体(保留原有简体字)": ("t2gov_keep_simp", "将繁体字形转换为规范繁体字形，保留原有简体字不变"),
+            "只将繁体旧字形转新字形": ("t2new", "仅将繁体字中的旧字形转换为新字形"),
+            "只将繁体旧字形转新字形(保留原有简体字)": ("t2new_keep_simp", "仅将繁体字中的旧字形转换为新字形，保留原有简体字不变")
+        }
+        self.conversion_mode = mode_map[mode][0]
+        self.mode_desc.set(mode_map[mode][1])
         
     def on_input_type_change(self):
         """输入类型改变事件处理"""
@@ -284,7 +313,7 @@ class TraditionalConverterGUI:
         # 在新线程中运行转换
         self.conversion_thread = threading.Thread(
             target=self.run_conversion, 
-            args=(input_path, output_path, self.input_type)
+            args=(input_path, output_path, self.conversion_mode, self.input_type)
         )
         self.conversion_thread.daemon = True
         self.conversion_thread.start()
@@ -292,22 +321,22 @@ class TraditionalConverterGUI:
         # 检查线程状态
         self.check_conversion_status()
         
-    def run_conversion(self, input_path, output_path, input_type):
+    def run_conversion(self, input_path, output_path, mode, input_type):
         """运行转换任务"""
         try:
             print(f"开始转换: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"转换模式: 繁体转规范繁体")  # 删除了 self.mode_var.get()，因为代码中没有定义 mode_var
+            print(f"转换模式: {self.mode_var.get()}")
             print(f"输入类型: {'单个文件' if input_type == 'file' else '文件夹'}")
             print(f"输入路径: {input_path}")
             print(f"输出路径: {output_path}")
             print("-" * 50)
-        
+            
             # 调用原有的转换函数
-            convert(input_path, output_path)
-        
+            convert(input_path, output_path, mode)
+            
             print("-" * 50)
             print(f"转换完成: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        
+            
         except Exception as e:
             print(f"转换过程中发生错误: {str(e)}")
             
@@ -492,14 +521,15 @@ def convert_doc_to_docx(input_path, output_folder):
         print(f"处理DOC文件 {input_path} 时出错: {str(e)}")
         return False
 
-def convert_txt(input_path, output_folder):
+def convert_txt(input_path, output_folder, mode):
     """
-    将txt文件转换为规范繁体
+    将txt文件转换
     :param input_path: 输入文件路径
     :param output_folder: 输出文件夹路径
+    :param mode: 转换模式
     :return: 转换后的文件路径或False
     """
-    cc = OpenCC('t2gov')
+    cc = OpenCC(mode)
     
     try:
         if not os.path.exists(input_path):
@@ -537,14 +567,17 @@ def convert_txt(input_path, output_folder):
         return False
 
 class DocxTraditionalSimplifiedConverter:
-    def __init__(self, config='t2gov'):
+    def __init__(self, mode):
         """
         初始化转换器
-        config: 转换配置
+        mode: 转换模式
         - 't2gov': 繁体转规范繁体
+        - 't2gov_keep_simp': 繁体转规范繁体(保留原有简体字)
+        - 't2new': 只将繁体旧字形转新字形
+        - 't2new_keep_simp': 只将繁体旧字形转新字形(保留原有简体字)
         """
-        self.cc = OpenCC(config)
-        self.config = config
+        self.cc = OpenCC(mode)
+        self.mode = mode
     
     def convert_text(self, text):
         """转换文本内容"""
@@ -814,11 +847,12 @@ class DocxTraditionalSimplifiedConverter:
                     for nested_table in cell.tables:
                         self._convert_tables([nested_table])
 
-def convert_docx(input_path, output_folder):
+def convert_docx(input_path, output_folder, mode):
     """
-    将Word文档转换为规范繁体
+    将Word文档转换
     :param input_path: 输入文件或文件夹路径
     :param output_folder: 输出文件夹路径
+    :param mode: 转换模式
     """
     try:
         if not os.path.exists(output_folder):
@@ -841,7 +875,7 @@ def convert_docx(input_path, output_folder):
                 print(f"正在处理: {os.path.basename(file_path)}")
                 
                 # 使用新的转换器类
-                converter = DocxTraditionalSimplifiedConverter('t2gov')
+                converter = DocxTraditionalSimplifiedConverter(mode)
                 output_path = os.path.join(output_folder, f"convert_{os.path.basename(file_path)}")
                 converter.convert_document(file_path, output_path)
                 print(f"已保存: {output_path}")
@@ -852,11 +886,12 @@ def convert_docx(input_path, output_folder):
     except Exception as e:
         print(f"发生错误: {str(e)}")
 
-def convert(input_path, output_folder):
+def convert(input_path, output_folder, mode='t2gov'):
     """
     统一处理docx、doc和txt文件的繁简转换
     :param input_path: 输入文件或文件夹路径
     :param output_folder: 输出文件夹路径
+    :param mode: 转换模式
     """
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -867,7 +902,7 @@ def convert(input_path, output_folder):
         file_ext = os.path.splitext(input_path)[1].lower()
         
         if file_ext == '.docx':
-            convert_docx(input_path, output_folder)
+            convert_docx(input_path, output_folder, mode)
         elif file_ext == '.doc':
             # 先转换为DOCX，然后再进行繁简转换   
             print("检测到DOC文件，先转换为DOCX格式...")
@@ -877,11 +912,11 @@ def convert(input_path, output_folder):
                 docx_path = convert_doc_to_docx(input_path, temp_dir)
                 if docx_path:
                     print("DOC文件转换成功，开始繁简转换...")
-                    convert_docx(docx_path, output_folder)
+                    convert_docx(docx_path, output_folder, mode)
                 else:
                     print("DOC文件转换失败")
         elif file_ext == '.txt':
-            result = convert_txt(input_path, output_folder)
+            result = convert_txt(input_path, output_folder, mode)
             if result:
                 print("txt文件转换完成！")
             else:
@@ -915,7 +950,7 @@ def convert(input_path, output_folder):
             if file_ext == '.docx':
                 # 对于docx文件，使用转换器类
                 try:
-                    converter = DocxTraditionalSimplifiedConverter('t2gov')
+                    converter = DocxTraditionalSimplifiedConverter(mode)
                     output_path = os.path.join(output_folder, f"convert_{filename}")
                     converter.convert_document(file_path, output_path)
                     success_count += 1
@@ -933,7 +968,7 @@ def convert(input_path, output_folder):
                     if docx_path:
                         print("DOC文件转换成功，开始繁简转换...")
                         try:
-                            converter = DocxTraditionalSimplifiedConverter('t2gov')
+                            converter = DocxTraditionalSimplifiedConverter(mode)
                             final_output_path = os.path.join(output_folder, f"convert_{os.path.splitext(filename)[0]}.docx")
                             converter.convert_document(docx_path, final_output_path)
                             success_count += 1
@@ -944,7 +979,7 @@ def convert(input_path, output_folder):
                         print(f"DOC文件 {filename} 转换失败")
             
             elif file_ext == '.txt':
-                if convert_txt(file_path, output_folder):
+                if convert_txt(file_path, output_folder, mode):
                     success_count += 1
         
         print(f"\n处理完成！成功转换 {success_count}/{len(supported_files)} 个文件")
@@ -966,9 +1001,20 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         main()
     else:
-        print("将繁体Word文档或txt文件转换成2013年版《通用规范汉字表》规范繁体字形")
-        print("=" * 60)
+        print("规范繁体字转换器")
+        print("=" * 40)
+        print("使用说明:")
+        print("1. 繁体转规范繁体: t2gov")
+        print("2. 繁体转规范繁体(保留原有简体字): t2gov_keep_simp")
+        print("3. 只将繁体旧字形转新字形: t2new")
+        print("4. 只将繁体旧字形转新字形(保留原有简体字): t2new_keep_simp")
+        print("=" * 40)
         
-        input_path = input("请输入Word文档或txt文件路径: ").strip('"\'')
+        mode = input("请输入转换模式 (t2gov/t2gov_keep_simp/t2new/t2new_keep_simp): ").strip()
+        if mode not in ['t2gov', 't2gov_keep_simp', 't2new', 't2new_keep_simp']:
+            print("错误：无效的转换模式")
+            sys.exit(1)
+            
+        input_path = input("请输入文件或文件夹路径: ").strip('"\'')
         output_folder = input("请输入输出文件夹路径: ").strip('"\'')
-        convert(input_path, output_folder)
+        convert(input_path, output_folder, mode)
