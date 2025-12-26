@@ -24,7 +24,7 @@ OpenCC转换的配置文件存于本仓库的“t2gov”文件夹下，使用者
 
 繁体转换为简体的方案文件为t2s.json，字表文件名为TSCharacters.txt，词典文件名为TSPhrases.txt。
 
-“transformer”文件夹下提供了一个Python转换程序。以Windows系统上使用为例，使用者在部署好Python环境后，在Powershell里执行pip install opencc python-docx chardet lxml pywin32 PyQt5 命令，安装依赖。安装成功后，将“t2gov”文件夹下所有文件复制到C:\Users\administrator(注：此处为你的计算机用户名，默认名称为administrator或admin，如有微软账户一般则为微软账户名)\AppData\Local\Programs\Python\Python313(注：此处为你安装的Python版本号，如有多个文件夹取数字最大的那个)\Lib\site-packages\opencc\clib\share\opencc下，再下载“transformer”文件夹里的转换程序并运行，即可实现doc文档、docx文档及txt文件的繁体字形转换。对于想在Windows下使用转换程序但不想体验繁琐的部署、安装流程的使用者，请直接移步[Releases](https://github.com/TerryTian-tech/OpenCC-Traditional-Chinese-characters-according-to-Chinese-government-standards/releases)选择适合你系统环境的包下载运行即可。
+“transformer”文件夹下提供了一个Python转换程序。以Windows系统上使用为例，使用者在部署好Python环境后，在Powershell里执行 pip install opencc python-docx chardet lxml pywin32 PyQt5 命令，安装依赖。安装成功后，将“t2gov”文件夹下所有文件复制到C:\Users\administrator(注：此处为你的计算机用户名，默认名称为administrator或admin，如有微软账户一般则为微软账户名)\AppData\Local\Programs\Python\Python313(注：此处为你安装的Python版本号，如有多个文件夹取数字最大的那个)\Lib\site-packages\opencc\clib\share\opencc下，再下载“transformer”文件夹里的转换程序并运行，即可实现doc文档、docx文档及txt文件的繁体字形转换。对于想在Windows下使用转换程序但不想体验繁琐的部署、安装流程的使用者，请直接移步[Releases](https://github.com/TerryTian-tech/OpenCC-Traditional-Chinese-characters-according-to-Chinese-government-standards/releases)选择适合你系统环境的包下载运行即可。
 
 在Mac和linux发行版下，请使用本仓库“transformer(Mac)”下提供的转换程序。该程序仅支持docx文档及txt文件的繁体字形转换，使用前需要使用者先安装部署好Python环境，在终端中执行 pip install opencc python-docx chardet lxml PyQt5 命令安装依赖，然后将本仓库“t2gov”下所有文件复制到Python打包的OpenCC储存转换方案的目录下（先执行pip show opencc命令找到OpenCC包具体所在位置，储存转换方案的位置一般在opencc/clib/share/opencc下，若不是可尝试搜索t2s.json等文件所在位置）。最后下载“transformer”文件夹里的转换程序并运行，即可实现docx文档及txt文件的繁体字形转换。
 
